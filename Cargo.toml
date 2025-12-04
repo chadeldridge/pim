@@ -1,0 +1,42 @@
+[package]
+name = "pim"
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+pim = { path = "" }
+
+[dependencies]
+anyhow = "1.0.100"
+clap = { version = "4.5.53", features = ["derive"] }
+content_inspector = "0.2.4"
+# Allows 'use pim::...' or 'use crate::...' to access internal modules. 
+#pim = { path = "" }
+serde_json = "1.0.145"
+serde_yaml = "0.9.34"
+thiserror = "2.0.17"
+
+#[workspace.lints.rust]
+#rust_2018_idioms = "warn" # TODO: could this be removed?
+
+#[workspace.lints.rustdoc]
+#private_intra_doc_links = "allow"
+
+[workspace.lints.clippy]
+all = { level = "allow", priority = -2 }
+correctness = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+disallowed_methods = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
+self_named_module_files = "warn"
+
+[[bin]]
+name = "pim"
+path = "src/bin/pim/main.rs"
+test = false
+doc = false
+
+#[lib]
+#name = "pim"
+#path = "src/pim/lib.rs"
