@@ -1,16 +1,24 @@
 use crate::core::error::*;
 use crate::core::input::{Input, InputKind};
+use crate::core::output::{Output, OutputFormat};
 use std::path::PathBuf;
 
 pub struct Shell {
-    input: Input,
+    pub input: Input,
+    pub output: Output,
 }
 
 impl Shell {
-    pub fn new(input_path: &PathBuf) -> Result<Self> {
+    pub fn new(
+        input_path: &PathBuf,
+        output_path: &PathBuf,
+        output_format: OutputFormat,
+    ) -> Result<Self> {
         let input = Input::new(input_path)?;
-        dbg!(&input);
-        Ok(Shell { input })
+        //dbg!(&input);
+        let output = Output::new(output_path, output_format)?;
+        dbg!(&output);
+        Ok(Shell { input, output })
     }
 
     pub fn is_terminal(&self) -> bool {
@@ -27,5 +35,9 @@ impl Shell {
             Err(e) => return Err(e),
         };
         Ok(content)
+    }
+
+    pub fn write_output<T: serde::Serialize>(&mut self, content: &T) -> Result<()> {
+        self.output.write(content)
     }
 }

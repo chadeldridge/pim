@@ -172,6 +172,7 @@ dependencies = [
  "anyhow",
  "clap",
  "content_inspector",
+ "serde",
  "serde_json",
  "serde_yaml",
  "thiserror",

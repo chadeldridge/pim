@@ -10,6 +10,7 @@ pim = { path = "" }
 anyhow = "1.0.100"
 clap = { version = "4.5.53", features = ["derive"] }
 content_inspector = "0.2.4"
+serde = "1.0.228"
 # Allows 'use pim::...' or 'use crate::...' to access internal modules. 
 #pim = { path = "" }
 serde_json = "1.0.145"

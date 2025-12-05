@@ -2,7 +2,7 @@ use clap::{CommandFactory, Parser};
 use pim::core::error::*;
 use pim::core::{InputKind, Shell};
 use serde_json::json;
-use std::{io::IsTerminal, path::PathBuf};
+use std::path::PathBuf;
 
 /// Command line arguments for PIM
 /// Handles arguments parsing and terminal I/O.
@@ -15,7 +15,8 @@ use std::{io::IsTerminal, path::PathBuf};
 )]
 pub struct Args {
     /// Input file path
-    file: PathBuf,
+    input_file: PathBuf,
+    output_file: Option<PathBuf>,
 }
 
 impl Args {
@@ -32,7 +33,11 @@ pub struct Cli {
 impl Cli {
     pub fn new() -> Result<Self> {
         let mut args = Args::new();
-        let shell = Shell::new(&args.file)?;
+        let output_file = match &args.output_file {
+            Some(p) => p.clone(),
+            None => PathBuf::from("<stdout>"),
+        };
+        let shell = Shell::new(&args.input_file, &output_file, Default::default())?;
 
         if shell.is_terminal() {
             // Taking terminal input is just silly so we print help and exit.
@@ -44,7 +49,7 @@ impl Cli {
         }
 
         if matches!(shell.input_kind(), InputKind::Stdin) {
-            args.file = PathBuf::from("<stdin>");
+            args.input_file = PathBuf::from("<stdin>");
         }
 
         Ok(Cli { args, shell })
@@ -61,7 +66,14 @@ impl Cli {
         }
     }
 
-    pub fn print(&self, content: &str) -> Result<String> {
+    pub fn print(&mut self, content: &str) -> Result<()> {
+        self.shell.write_output(&json!({
+            "input": self.args.input_file.display().to_string(),
+            "output": self.shell.output.path.display().to_string(),
+            "output_format": self.shell.output.format.as_str(),
+            "content": content,
+        }))
+        /*
         let data = if std::io::stdout().is_terminal() {
             serde_json::to_string_pretty(&json!({
                 "input": self.args.file.display().to_string(),
@@ -86,5 +98,6 @@ impl Cli {
                     .context("Error generating output"),
             ),
         }
+        */
     }
 }
