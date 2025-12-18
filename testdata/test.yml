@@ -1,1 +1,21 @@
-my test text for two
+# Test comments
+- jobs:
+    - blackbox_icmp
+    - blackbox_ssh
+    - node_exporter
+  labels:
+    environment: dev
+    role: util
+    application: util
+  targets:
+    - server1.example.com
+    - server2
+- jobs:
+    - blackbox_ssh
+  labels:
+    environment: prd
+    role: web-server
+    application: radsite
+  targets:
+    - server1.example.com
+    - server2
