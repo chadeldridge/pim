@@ -1,4 +1,4 @@
-use std::io::Write;
+use log::{error, warn};
 use thiserror::Error;
 
 // Barrowed from eza.
@@ -14,7 +14,7 @@ pub const CODE_OPTIONS_ERROR: i32 = 3;
 /// Exit code for missing file permissions
 pub const CODE_PERMISSION_DENIED: i32 = 13;
 
-// Barrowed heavily from bat.
+// Barrowed heavily from bat because I'm still learning.
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -114,17 +114,17 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn handle_error(error: &Error, output: &mut dyn Write) {
+pub fn handle_error(error: &Error) {
     match &error.source {
         SourceError::Io(io_err) if io_err.kind() == std::io::ErrorKind::BrokenPipe => {
-            // Silent exit on broken pipe
+            warn!("Broken pipe encountered: {}", io_err);
             ::std::process::exit(0);
         }
         SourceError::SerdeJson(_) | SourceError::SerdeYaml(_) => {
-            writeln!(output, "Error while parsing file: {error}",).ok();
+            error!("Error while parsing file: {error}")
         }
         _ => {
-            writeln!(output, "{error}",).ok();
+            error!("{error}")
         }
     }
 }
