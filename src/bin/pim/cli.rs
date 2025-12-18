@@ -1,22 +1,22 @@
 use clap::{CommandFactory, Parser};
+use log::debug;
 use pim::core::error::*;
-use pim::core::{InputKind, Shell};
-use serde_json::json;
-use std::path::PathBuf;
+use pim::core::{Input, InputKind, Output};
+use std::{fs::read_dir, path::PathBuf};
 
 /// Command line arguments for PIM
 /// Handles arguments parsing and terminal I/O.
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(
-    name = "pim-export",
+    name = "pim",
     version = "1.0",
     about = "Export PIM data",
     arg_required_else_help = true
 )]
 pub struct Args {
     /// Input file path
-    input_file: PathBuf,
-    output_file: Option<PathBuf>,
+    source: PathBuf,
+    target: Option<PathBuf>,
 }
 
 impl Args {
@@ -25,79 +25,136 @@ impl Args {
     }
 }
 
+#[derive(Debug)]
 pub struct Cli {
-    pub args: Args,
-    shell: Shell,
+    args: Args,
 }
 
 impl Cli {
-    pub fn new() -> Result<Self> {
-        let mut args = Args::new();
-        let output_file = match &args.output_file {
-            Some(p) => p.clone(),
-            None => PathBuf::from("<stdout>"),
-        };
-        let shell = Shell::new(&args.input_file, &output_file, Default::default())?;
-
-        if shell.is_terminal() {
-            // Taking terminal input is just silly so we print help and exit.
-            return Err(Error::new(SourceError::Msg(
-                "Refusing to run with terminal input/output".to_string(),
-            ))
-            .code(CODE_OPTIONS_ERROR)
-            .print_help());
-        }
-
-        if matches!(shell.input_kind(), InputKind::Stdin) {
-            args.input_file = PathBuf::from("<stdin>");
-        }
-
-        Ok(Cli { args, shell })
+    pub fn new() -> Self {
+        debug!("Initializing CLI");
+        Cli { args: Args::new() }
     }
 
-    pub fn print_help(&self) {
+    pub fn args(&self) -> &Args {
+        &self.args
+    }
+
+    pub fn print_help() {
         let _ = Args::command().print_help();
     }
 
-    pub fn read_input(&mut self) -> Result<String> {
-        match self.shell.read_input() {
-            Ok(c) => Ok(c),
-            Err(e) => Err(e),
+    pub fn inputs(&mut self) -> Result<Vec<Input>> {
+        debug!("Getting input sources: {:?}", self.args.source);
+        let inputs = get_sources(&self.args.source)?;
+        debug!("Input sources obtained: {:?}", inputs);
+        if inputs.is_empty() {
+            return Err(Error::new(SourceError::InvalidInputSource(
+                "No valid input sources found".to_string(),
+            ))
+            .code(CODE_OPTIONS_ERROR));
         }
+
+        // If inputs is stdin then we have some extra work to do.
+        //
+        // Return an error if the input is a terminal. Interactive terminal input isn't realistic
+        // for this tool.
+        //
+        // If it is stdin and not an interactive terminal, update the source arg to reflect that.
+        debug!("Validating input sources");
+        if inputs.len() == 1 && matches!(inputs[0].kind(), InputKind::Stdin) {
+            // Bail on terminal input.
+            if inputs[0].is_terminal() {
+                return Err(Error::new(SourceError::Msg(
+                    "Refusing to run with terminal input/output".to_string(),
+                ))
+                .code(CODE_OPTIONS_ERROR)
+                .print_help());
+            }
+
+            debug!("Input is stdin, updating source arg");
+            self.args.source = PathBuf::from("<stdin>");
+        }
+
+        debug!("Input sources validated, returning Ok");
+        Ok(inputs)
     }
 
-    pub fn print(&mut self, content: &str) -> Result<()> {
-        self.shell.write_output(&json!({
-            "input": self.args.input_file.display().to_string(),
-            "output": self.shell.output.path.display().to_string(),
-            "output_format": self.shell.output.format.as_str(),
-            "content": content,
-        }))
-        /*
-        let data = if std::io::stdout().is_terminal() {
-            serde_json::to_string_pretty(&json!({
-                "input": self.args.file.display().to_string(),
-                "content": content,
-            }))
-        } else {
-            Ok(json!({
-                "input": self.args.file.display().to_string(),
-                "content": content,
-            })
-            .to_string())
+    pub fn output(&self) -> Result<Output> {
+        debug!("Getting output destination");
+        let output_file = match &self.args.target {
+            Some(p) => p,
+            None => &PathBuf::from("<stdout>"),
         };
 
-        match data {
-            Ok(d) => {
-                println!("{}", d);
-                Ok(d)
-            }
-            Err(e) => Err(
-                Error::new(SourceError::Msg(format!("Error generating output: {}", e,)))
-                    .code(CODE_OPTIONS_ERROR)
-                    .context("Error generating output"),
-            ),
-        }
-        */
+        debug!("Output destination obtained: {:?}", output_file);
+        Output::new(output_file, Default::default())
     }
+}
+
+fn get_sources(path: &PathBuf) -> Result<Vec<Input>> {
+    debug!("Getting sources from path: {:?}", path);
+    let mut inputs = Vec::new();
+    let input = Input::new(path)?;
+    match &input.kind() {
+        InputKind::Stdin => {
+            debug!("Input is stdin");
+            inputs.push(input);
+        }
+        InputKind::File(path) => {
+            if input.is_dir() {
+                debug!("Input is a directory");
+                let mut dir_inputs = from_dir(path)?;
+                debug!("Directory inputs obtained: {:?}", dir_inputs);
+                inputs.append(&mut dir_inputs);
+                return Ok(inputs);
+            }
+
+            if input.is_binary() {
+                return Err(Error::new(SourceError::InvalidInputSource(
+                    path.display().to_string() + ": " + "Binary input is not supported",
+                ))
+                .code(CODE_OPTIONS_ERROR));
+            }
+
+            debug!("Input is a file");
+            inputs.push(input);
+        }
+    }
+
+    debug!("Sources obtained: {:?}", inputs);
+    Ok(inputs)
+}
+
+fn from_dir(path: &PathBuf) -> Result<Vec<Input>> {
+    debug!("Getting inputs from directory: {}", path.display());
+    let mut inputs = Vec::new();
+    let entries = read_dir(path).map_err(|e| {
+        Error::new(SourceError::Io(e))
+            .context(format!("reading directory: {}", path.display()).as_str())
+            .code(CODE_RUNTIME_ERROR)
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            Error::new(SourceError::Io(e))
+                .context(format!("reading directory entry in: {}", path.display()).as_str())
+                .code(CODE_RUNTIME_ERROR)
+        })?;
+        let file_path = entry.path();
+        debug!("Processing directory entry: {}", file_path.display());
+        if file_path.is_dir() {
+            debug!("Entry is a directory, recursing into it");
+            let mut dir_inputs = from_dir(&file_path)?;
+            inputs.append(&mut dir_inputs);
+            continue;
+        }
+
+        debug!("Entry is a file, creating Input");
+        let input = Input::from_file(&file_path)?;
+        inputs.push(input);
+    }
+
+    debug!("Directory inputs obtained: {:?}", inputs);
+    Ok(inputs)
 }
