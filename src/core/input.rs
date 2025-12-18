@@ -1,21 +1,23 @@
 use crate::core::error::*;
+use crate::core::io::*;
 use content_inspector::ContentType;
+use log::{debug, warn};
 use std::{
     fmt::Debug,
-    fs::{File, metadata},
+    fs::{File, Metadata, metadata},
     io::{BufRead, BufReader, IsTerminal, stdin},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 pub const DEFAULT_INPUT_FORMAT: InputFormat = InputFormat::Yaml;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputKind {
     Stdin,
     File(PathBuf),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputFormat {
     Json,
     Yaml,
@@ -29,7 +31,7 @@ impl Default for InputFormat {
 }
 
 impl InputFormat {
-    pub fn from_extension(path: &PathBuf) -> Self {
+    pub fn from_extension(path: &Path) -> Self {
         let ext = match path.extension() {
             Some(e) => e.to_str().unwrap_or("").to_lowercase(),
             None => "".to_string(),
@@ -52,12 +54,13 @@ impl InputFormat {
 }
 
 pub struct Input {
-    pub reader: Box<dyn BufRead>,
-    pub kind: InputKind,
-    pub format: InputFormat,
-    pub is_terminal: bool,
-    pub content_type: Option<ContentType>,
-    pub content: String,
+    reader: Box<dyn BufRead>,
+    kind: InputKind,
+    format: InputFormat,
+    is_terminal: bool,
+    content_type: Option<ContentType>,
+    content: String,
+    metadata: Option<Metadata>,
 }
 
 impl Debug for Input {
@@ -72,31 +75,40 @@ impl Debug for Input {
 }
 
 impl Input {
-    pub fn new(path: &PathBuf) -> Result<Self> {
+    pub fn new(path: &Path) -> Result<Self> {
         let mut input;
-        if path == &PathBuf::from("-") {
+        if path == Path::new("-") {
             input = Self::from_stdin();
         } else {
-            match Self::from_file(path) {
-                Ok(reader) => {
-                    input = reader;
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
+            input = Self::from_file(&path.to_path_buf())?;
         }
 
         input.inspect_content()?;
         Ok(input)
     }
 
-    pub fn input_format(&self) -> &InputFormat {
+    pub fn format(&self) -> &InputFormat {
         &self.format
     }
 
-    pub fn buf_reader(&mut self) -> &mut dyn BufRead {
-        &mut *self.reader
+    pub fn reader(&self) -> &dyn BufRead {
+        &self.reader
+    }
+
+    pub fn mut_reader(&mut self) -> &mut dyn BufRead {
+        &mut self.reader
+    }
+
+    pub fn kind(&self) -> &InputKind {
+        &self.kind
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        self.is_terminal
+    }
+
+    pub fn content(&self) -> &String {
+        &self.content
     }
 
     pub fn is_binary(&self) -> bool {
@@ -106,7 +118,15 @@ impl Input {
         }
     }
 
+    pub fn is_dir(&self) -> bool {
+        match &self.kind {
+            InputKind::File(_) => is_dir(&self.metadata),
+            InputKind::Stdin => false,
+        }
+    }
+
     pub fn from_stdin() -> Self {
+        debug!("Creating Input from stdin");
         Input {
             reader: Box::new(BufReader::new(stdin())),
             kind: InputKind::Stdin,
@@ -114,94 +134,61 @@ impl Input {
             is_terminal: stdin().is_terminal(),
             content_type: None,
             content: String::new(),
+            metadata: None,
         }
     }
 
     pub fn from_file(path: &PathBuf) -> Result<Self> {
-        _ = match check_file(path) {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(e.context(format!("error checking file: {}", path.display()).as_str()));
-            }
-        };
+        debug!("Creating Input from file: {}", path.display());
+        let metadata = metadata(path).map_err(|e| {
+            Error::new(SourceError::Io(e))
+                .context(format!("error checking file: {}", path.display()).as_str())
+                .code(CODE_RUNTIME_ERROR)
+                .print_help()
+        })?;
+        debug!("File metadata obtained: {:?}", metadata);
 
         let format = InputFormat::from_extension(path);
+        debug!(
+            "Determined input format as '{}' from file extension",
+            format.as_str()
+        );
 
-        let file = match File::open(path) {
-            Ok(f) => f,
-            Err(e) => {
-                return Err(Error::new(SourceError::Io(e))
-                    .context(format!("opening file: {}", path.display()).as_str())
-                    .code(CODE_RUNTIME_ERROR)
-                    .print_help());
-            }
-        };
+        let file = File::open(path).map_err(|e| {
+            Error::new(SourceError::Io(e))
+                .context(format!("opening file: {}", path.display()).as_str())
+                .code(CODE_RUNTIME_ERROR)
+                .print_help()
+        })?;
+        debug!("File opened successfully: {}", path.display());
 
         Ok(Input {
             reader: Box::new(BufReader::new(file)),
             kind: InputKind::File(path.to_path_buf()),
-            format: format,
+            format,
             is_terminal: false,
             content_type: None,
             content: String::new(),
+            metadata: Some(metadata),
         })
     }
 
     pub fn inspect_content(&mut self) -> Result<()> {
-        let content = read_first_line(&mut *self.reader)?;
+        debug!("Inspecting content type for input: {:?}", self.kind);
+        let content = read_first_line(&mut self.reader)?;
 
         if content.is_empty() {
+            warn!("File {:?} is empty", self.kind);
             return Ok(());
         }
 
-        let content_type = content_inspector::inspect(&content.as_bytes());
+        let content_type = content_inspector::inspect(content.as_bytes());
         self.content_type = Some(content_type);
         self.content = content;
+        debug!(
+            "Content type inspected: {:?} based on content: {}",
+            self.content_type, self.content
+        );
         Ok(())
-    }
-
-    pub fn read_content(&mut self) -> Result<bool> {
-        let reader = &mut *self.reader;
-        for line in reader.lines() {
-            match line {
-                Ok(l) => self.content.push_str(&l),
-                Err(e) => {
-                    return Err(Error::new(SourceError::Io(e))
-                        .context("reading input content")
-                        .code(CODE_RUNTIME_ERROR));
-                }
-            }
-        }
-
-        Ok(true)
-    }
-}
-
-// check_file checks if the file exists and is not a directory. Returns Ok(true) if it's a valid
-// file, otherwise returns an appropriate Error.
-fn check_file(path: &PathBuf) -> Result<bool> {
-    match metadata(path) {
-        Ok(metadata) => match metadata.is_dir() {
-            // If it's a directory, return IsADirectory io::Error.
-            true => Err(Error::new(SourceError::Io(std::io::Error::new(
-                std::io::ErrorKind::IsADirectory,
-                "Is a directory",
-            )))
-            .code(CODE_RUNTIME_ERROR)),
-            false => Ok(true),
-        },
-        Err(e) => Err(Error::new(SourceError::Io(e))
-            .code(CODE_RUNTIME_ERROR)
-            .print_help()),
-    }
-}
-
-pub fn read_first_line<R: BufRead>(mut reader: R) -> Result<String> {
-    let mut content = String::new();
-    match reader.read_line(&mut content) {
-        Ok(_) => Ok(content),
-        Err(e) => Err(Error::new(SourceError::Io(e))
-            .context("reading first line")
-            .code(CODE_RUNTIME_ERROR)),
     }
 }
