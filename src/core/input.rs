@@ -4,8 +4,8 @@ use content_inspector::ContentType;
 use log::{debug, warn};
 use std::{
     fmt::Debug,
-    fs::{File, Metadata, metadata},
-    io::{BufRead, BufReader, IsTerminal, stdin},
+    fs::{Metadata, metadata},
+    io::{IsTerminal, stdin},
     path::{Path, PathBuf},
 };
 
@@ -54,7 +54,7 @@ impl InputFormat {
 }
 
 pub struct Input {
-    reader: Box<dyn BufRead>,
+    reader: Reader,
     kind: InputKind,
     format: InputFormat,
     is_terminal: bool,
@@ -77,10 +77,21 @@ impl Debug for Input {
 impl Input {
     pub fn new(path: &Path) -> Result<Self> {
         let mut input;
-        if path == Path::new("-") {
-            input = Self::from_stdin();
-        } else {
-            input = Self::from_file(&path.to_path_buf())?;
+        let reader = Reader::new(path)?;
+        match reader {
+            Reader::Stdin(_) => {
+                input = Self::from_stdin(reader);
+            }
+            Reader::File(_) => {
+                input = Self::from_file(&path.to_path_buf(), reader)?;
+            }
+            Reader::None => {
+                return Err(Error::new(SourceError::InvalidInputSource(
+                    path.display().to_string(),
+                ))
+                .context("Input source is None")
+                .code(CODE_RUNTIME_ERROR));
+            }
         }
 
         input.inspect_content()?;
@@ -91,11 +102,11 @@ impl Input {
         &self.format
     }
 
-    pub fn reader(&self) -> &dyn BufRead {
+    pub fn reader(&self) -> &Reader {
         &self.reader
     }
 
-    pub fn mut_reader(&mut self) -> &mut dyn BufRead {
+    pub fn mut_reader(&mut self) -> &mut Reader {
         &mut self.reader
     }
 
@@ -125,10 +136,10 @@ impl Input {
         }
     }
 
-    pub fn from_stdin() -> Self {
+    pub fn from_stdin(reader: Reader) -> Self {
         debug!("Creating Input from stdin");
         Input {
-            reader: Box::new(BufReader::new(stdin())),
+            reader,
             kind: InputKind::Stdin,
             format: DEFAULT_INPUT_FORMAT,
             is_terminal: stdin().is_terminal(),
@@ -138,7 +149,7 @@ impl Input {
         }
     }
 
-    pub fn from_file(path: &PathBuf) -> Result<Self> {
+    pub fn from_file(path: &PathBuf, reader: Reader) -> Result<Self> {
         debug!("Creating Input from file: {}", path.display());
         let metadata = metadata(path).map_err(|e| {
             Error::new(SourceError::Io(e))
@@ -154,16 +165,8 @@ impl Input {
             format.as_str()
         );
 
-        let file = File::open(path).map_err(|e| {
-            Error::new(SourceError::Io(e))
-                .context(format!("opening file: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
-                .print_help()
-        })?;
-        debug!("File opened successfully: {}", path.display());
-
         Ok(Input {
-            reader: Box::new(BufReader::new(file)),
+            reader,
             kind: InputKind::File(path.to_path_buf()),
             format,
             is_terminal: false,
@@ -175,7 +178,18 @@ impl Input {
 
     pub fn inspect_content(&mut self) -> Result<()> {
         debug!("Inspecting content type for input: {:?}", self.kind);
-        let content = read_first_line(&mut self.reader)?;
+        //let content = read_first_line(&mut self.reader)?;
+        let content = match &mut self.reader {
+            Reader::Stdin(r) => read_first_line(r)?,
+            Reader::File(file) => read_first_line(file)?,
+            Reader::None => {
+                return Err(Error::new(SourceError::InvalidInputSource(
+                    "No reader available (None), skipping content inspection".to_string(),
+                ))
+                .context("No reader available (None) during content inspection")
+                .code(CODE_RUNTIME_ERROR));
+            }
+        };
 
         if content.is_empty() {
             warn!("File {:?} is empty", self.kind);

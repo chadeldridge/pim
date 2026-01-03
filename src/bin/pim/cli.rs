@@ -9,13 +9,17 @@ use std::{fs::read_dir, path::PathBuf};
 #[derive(Debug, Parser)]
 #[command(
     name = "pim",
-    version = "1.0",
-    about = "Export PIM data",
-    arg_required_else_help = true
+    version,
+    about = "Convert source format to Prometheus file_sd target data"
 )]
 pub struct Args {
-    /// Input file path
-    source: PathBuf,
+    /// Input source file path. Can be a file or directory.
+    //source: PathBuf,
+    #[arg(short, long)]
+    source: Option<PathBuf>,
+    // TODO: Change to output target file argument
+    /// Output target file path. Can be a file or directory.
+    #[arg(short, long)]
     target: Option<PathBuf>,
 }
 
@@ -40,14 +44,20 @@ impl Cli {
         &self.args
     }
 
+    pub fn source(&self) -> PathBuf {
+        match &self.args.source {
+            Some(p) => p.to_path_buf(),
+            None => PathBuf::from("-"),
+        }
+    }
+
     pub fn print_help() {
         let _ = Args::command().print_help();
     }
 
     pub fn inputs(&mut self) -> Result<Vec<Input>> {
         debug!("Getting input sources: {:?}", self.args.source);
-        let inputs = get_sources(&self.args.source)?;
-        debug!("Input sources obtained: {:?}", inputs);
+        let inputs = get_sources(&self.source())?;
         if inputs.is_empty() {
             return Err(Error::new(SourceError::InvalidInputSource(
                 "No valid input sources found".to_string(),
@@ -73,7 +83,7 @@ impl Cli {
             }
 
             debug!("Input is stdin, updating source arg");
-            self.args.source = PathBuf::from("<stdin>");
+            self.args.source = Some(PathBuf::from("<stdin>"));
         }
 
         debug!("Input sources validated, returning Ok");
@@ -151,7 +161,7 @@ fn from_dir(path: &PathBuf) -> Result<Vec<Input>> {
         }
 
         debug!("Entry is a file, creating Input");
-        let input = Input::from_file(&file_path)?;
+        let input = Input::new(&file_path)?;
         inputs.push(input);
     }
 

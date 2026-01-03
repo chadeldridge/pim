@@ -2,10 +2,65 @@ use crate::core::error::*;
 use log::debug;
 use std::{
     fs::{File, Metadata},
-    io::BufRead,
-    io::Write,
+    io::{BufRead, BufReader, Read, Stdin, Write, stdin},
     path::Path,
 };
+
+#[derive(Debug)]
+pub enum Reader {
+    Stdin(BufReader<Stdin>),
+    File(BufReader<File>),
+    None,
+}
+
+impl Reader {
+    pub fn new(path: &Path) -> Result<Self> {
+        // Check for stdin first.
+        if path_is_stdin(path) {
+            debug!("Creating Stdin reader");
+            //return Ok(Reader::Stdin(stdin()));
+            return Ok(Reader::Stdin(BufReader::new(stdin())));
+        }
+
+        // Otherwise, create a file reader.
+        debug!("Creating File reader for path: {}", path.display());
+        let file = File::open(path).map_err(|e| {
+            Error::new(SourceError::Io(e))
+                .context(format!("Failed to open input file: {}", path.display()).as_str())
+                .code(CODE_RUNTIME_ERROR)
+                .print_help()
+        })?;
+        Ok(Reader::File(BufReader::new(file)))
+    }
+}
+
+impl Read for Reader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Reader::Stdin(stdin) => stdin.read(buf),
+            Reader::File(file) => file.read(buf),
+            Reader::None => Ok(0),
+        }
+    }
+}
+
+impl BufRead for Reader {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        match self {
+            Reader::Stdin(stdin) => stdin.fill_buf(),
+            Reader::File(file) => file.fill_buf(),
+            Reader::None => Ok(&[]),
+        }
+    }
+
+    fn consume(&mut self, amt: usize) {
+        match self {
+            Reader::Stdin(stdin) => stdin.consume(amt),
+            Reader::File(file) => file.consume(amt),
+            Reader::None => {}
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum Writer {
@@ -56,6 +111,10 @@ impl Writer {
             }
         }
     }
+}
+
+fn path_is_stdin(path: &Path) -> bool {
+    path == Path::new("-") || path.to_str().unwrap_or("<stdout>") == "<stdin>"
 }
 
 pub fn read_first_line<R: BufRead>(mut reader: R) -> Result<String> {
