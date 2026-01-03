@@ -7,6 +7,57 @@ use std::{
     path::Path,
 };
 
+#[derive(Debug)]
+pub enum Writer {
+    Stdout(std::io::Stdout),
+    File(std::fs::File),
+    None,
+}
+
+impl Writer {
+    pub fn new(path: &Path) -> Result<Self> {
+        // Check for stdout first.
+        if path.to_str().unwrap_or("<stdout>") == "<stdout>" {
+            debug!("Creating Stdout writer");
+            return Ok(Writer::Stdout(std::io::stdout()));
+        }
+
+        // Check for directory next.
+        if path.is_dir() {
+            debug!("Creating None writer for directory: {}", path.display());
+            return Ok(Writer::None);
+        }
+
+        // Otherwise, create a file writer.
+        debug!("Creating File writer for path: {}", path.display());
+        let file = File::create(path).map_err(|e| {
+            Error::new(SourceError::Io(e))
+                .context(format!("Failed to create output file: {}", path.display()).as_str())
+                .code(CODE_RUNTIME_ERROR)
+        })?;
+        Ok(Writer::File(file))
+    }
+
+    pub fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        match self {
+            Writer::Stdout(stdout) => stdout.write_all(buf).map_err(|e| {
+                Error::new(SourceError::Io(e))
+                    .context("Writing to stdout")
+                    .code(CODE_RUNTIME_ERROR)
+            }),
+            Writer::File(file) => file.write_all(buf).map_err(|e| {
+                Error::new(SourceError::Io(e))
+                    .context("Writing to file")
+                    .code(CODE_RUNTIME_ERROR)
+            }),
+            Writer::None => {
+                debug!("No writer available (None), skipping write");
+                Ok(())
+            }
+        }
+    }
+}
+
 pub fn read_first_line<R: BufRead>(mut reader: R) -> Result<String> {
     let mut content = String::new();
     // read_line returns the number of bytes read, which we do not care about here.
@@ -24,23 +75,5 @@ pub fn is_dir(metadata: &Option<Metadata>) -> bool {
         // The input should only have None if it did not exists, in which case we should
         // have returned an error already, so this should never match.
         None => false,
-    }
-}
-
-pub fn get_writer(path: &Path) -> Result<Box<dyn Write>> {
-    // Determine if the path is a directory or file. If it is a directory, create an empty or
-    // default file buffer since it will not be used. If it is a file, create the file buffer.
-    if path.is_dir() {
-        debug!("Creating output writer for directory: {}", path.display());
-        let file = Vec::new();
-        Ok(Box::new(file))
-    } else {
-        debug!("Creating output writer from file: {}", path.display());
-        let file = File::create(path).map_err(|e| {
-            Error::new(SourceError::Io(e))
-                .context(format!("Failed to create output file: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
-        })?;
-        Ok(Box::new(file))
     }
 }
