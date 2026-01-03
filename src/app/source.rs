@@ -137,7 +137,6 @@ impl SourceFile {
                     //debug!("Deserializing as YAML: {}", content);
                     //serde_yaml::from_str(content).map_err(|e| {
                     serde_yaml::from_reader(input.mut_reader()).map_err(|e| {
-                        //dbg!(content);
                         Error::new(SourceError::SerdeYaml(e))
                             .context("Failed to deserialize source from YAML")
                             .code(CODE_RUNTIME_ERROR)
