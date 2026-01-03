@@ -4,7 +4,7 @@ use log::debug;
 use std::{
     cmp::Ordering,
     fmt::Debug,
-    io::{IsTerminal, Write},
+    io::IsTerminal,
     path::{Path, PathBuf},
 };
 
@@ -59,10 +59,11 @@ impl OutputFormat {
 
 pub struct Output {
     path: PathBuf,
-    writer: Box<dyn Write>,
+    writer: Writer,
     kind: OutputKind,
     format: OutputFormat,
-    pretty: bool,
+    // Make pretty public to allow overriding pretty writer logic. Useful for testing.
+    pub pretty: bool,
 }
 
 impl Debug for Output {
@@ -104,17 +105,24 @@ impl Output {
     pub fn new(path: &PathBuf, format: OutputFormat) -> Result<Self> {
         debug!("Creating new Output for path: {:?}", path);
         // The only time we don't pretty print is when writing to non-terminal stdout.
-        let (writer, kind, pretty): (Box<dyn std::io::Write>, OutputKind, bool) =
-            if path.to_str().unwrap_or("<stdout>") == "<stdout>" {
+        let writer = Writer::new(path)?;
+        let (kind, pretty): (OutputKind, bool) = match &writer {
+            Writer::Stdout(_) => {
                 debug!("Outputting to stdout");
+                // Check if stdout is a terminal to determine pretty printing.
                 let is_terminal = std::io::stdout().is_terminal();
-                (Box::new(std::io::stdout()), OutputKind::Stdout, is_terminal)
-            } else {
+                (OutputKind::Stdout, is_terminal)
+            }
+            Writer::File(_) => {
                 debug!("Outputting to file: {:?}", path);
-                let w = get_writer(path)?;
                 // Files should always be written with pretty printing for readability.
-                (w, OutputKind::new(path), true)
-            };
+                (OutputKind::File(path.clone()), true)
+            }
+            Writer::None => {
+                debug!("Outputting to directory: {:?}", path);
+                (OutputKind::Directory(path.clone()), false)
+            }
+        };
 
         debug!(
             "Output created with kind: {:?}, format: {:?}, pretty: {}",
@@ -133,7 +141,7 @@ impl Output {
         &self.path
     }
 
-    pub fn writer(&mut self) -> &mut dyn Write {
+    pub fn writer(&mut self) -> &mut Writer {
         &mut self.writer
     }
 
@@ -161,7 +169,7 @@ impl Output {
 
 // Write unpretty formatted output to the file or stdout.
 pub fn raw<T: serde::Serialize>(
-    writer: &mut Box<dyn Write>,
+    writer: &mut Writer,
     content: &T,
     format: &OutputFormat,
 ) -> Result<()> {
@@ -180,15 +188,12 @@ pub fn raw<T: serde::Serialize>(
     };
 
     debug!("Writing data:\n{}", data);
-    match writer.write_all(data.as_bytes()) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::new(SourceError::Io(e)).context("Failed to write output")),
-    }
+    writer.write_all(data.as_bytes())
 }
 
 // Write pretty formatted output to the file or stdout.
 pub fn pretty<T: serde::Serialize>(
-    writer: &mut Box<dyn Write>,
+    writer: &mut Writer,
     content: &T,
     format: &OutputFormat,
     job: &str,
@@ -222,10 +227,5 @@ pub fn pretty<T: serde::Serialize>(
     }
 
     debug!("Writing data");
-    match writer.write_all(data.as_bytes()) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::new(SourceError::Io(e))
-            .context("Failed to write output")
-            .code(CODE_RUNTIME_ERROR)),
-    }
+    writer.write_all(data.as_bytes())
 }
