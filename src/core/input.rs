@@ -66,10 +66,13 @@ pub struct Input {
 impl Debug for Input {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Input")
+            .field("reader", &"Reader {...}")
             .field("kind", &self.kind)
             .field("format", &self.format)
             .field("is_terminal", &self.is_terminal)
             .field("content_type", &self.content_type)
+            .field("content", &self.content)
+            .field("metadata", &self.metadata)
             .finish()
     }
 }

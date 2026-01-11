@@ -128,3 +128,101 @@ pub fn handle_error(error: &Error) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn test_source_error_variants() {
+        let io_error = std::io::Error::other("io error");
+        let err_io = SourceError::Io(io_error);
+        assert!(matches!(err_io, SourceError::Io(..)));
+        //let _ = SourceError::SerdeJson(serde_json::Error::io(io_error));
+        //let _ = SourceError::SerdeYaml(serde_yaml::errors::new(io_error));
+        let err_uif = SourceError::UnsupportedInputFormat("unsupported".to_string());
+        assert!(matches!(err_uif, SourceError::UnsupportedInputFormat(_)));
+        let err_uof = SourceError::UnsupportedOutputFormat("unsupported".to_string());
+        assert!(matches!(err_uof, SourceError::UnsupportedOutputFormat(_)));
+        let err_iis = SourceError::InvalidInputSource("invalid".to_string());
+        assert!(matches!(err_iis, SourceError::InvalidInputSource(_)));
+        let err_msg = SourceError::Msg("message".to_string());
+        assert!(matches!(err_msg, SourceError::Msg(_)));
+    }
+
+    #[test]
+    fn test_source_error_debug() {
+        let err = SourceError::Msg("test".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("Msg"));
+    }
+
+    #[test]
+    fn test_source_error_from_string() {
+        let err: SourceError = String::from("error message").into();
+        assert!(matches!(err, SourceError::Msg(ref msg) if msg == "error message"));
+    }
+
+    #[test]
+    fn test_source_error_from_str() {
+        let err: SourceError = "error message".into();
+        assert!(matches!(err, SourceError::Msg(ref msg) if msg == "error message"));
+    }
+
+    #[test]
+    fn test_error_builder_methods() {
+        let source_err = SourceError::Msg("source error".to_string());
+        let err = Error::new(source_err)
+            .context("additional context")
+            .print_help()
+            .code(42);
+        assert_eq!(err.context, "additional context");
+        assert!(err.print_help);
+        assert_eq!(err.code, Some(42));
+    }
+
+    #[test]
+    fn test_error_display() {
+        let source_err = SourceError::Msg("source error".to_string());
+        let err = Error::new(source_err).context("additional context");
+        let display_str = format!("{}", err);
+        assert!(display_str.contains("additional context"));
+        assert!(display_str.contains("source error"));
+    }
+
+    #[test]
+    fn test_handle_error_broken_pipe() {
+        let io_error = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "broken pipe");
+        let err = Error::new(SourceError::Io(io_error));
+        // This will exit the process, so we can't actually call it in a test.
+        // handle_error(&err);
+        // Instead, we just ensure it matches the broken pipe case.
+        match &err.source {
+            SourceError::Io(io_err) if io_err.kind() == std::io::ErrorKind::BrokenPipe => {}
+            _ => panic!("Expected broken pipe error"),
+        }
+    }
+
+    #[test]
+    fn test_handle_error_other() {
+        let source_err = SourceError::Msg("some error".to_string());
+        let err = Error::new(source_err);
+        // This will log the error, so we can't easily test the logging output here.
+        // handle_error(&err);
+        // Instead, we just ensure it matches the other case.
+        match &err.source {
+            SourceError::Msg(msg) if msg == "some error" => {}
+            _ => panic!("Expected some error message"),
+        }
+    }
+
+    #[test]
+    fn test_result_type_alias() {
+        fn example_function() -> Result<i32> {
+            Ok(42)
+        }
+        let result = example_function();
+        assert_eq!(result.unwrap(), 42);
+    }
+}
