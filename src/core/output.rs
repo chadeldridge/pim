@@ -177,13 +177,13 @@ pub fn raw<T: serde::Serialize>(
     let data = match format {
         OutputFormat::Json => serde_json::to_string(content).map_err(|e| {
             Error::new(SourceError::SerdeJson(e))
-                .context("Failed to serialize to JSON")
-                .code(CODE_RUNTIME_ERROR)
+                .set_context("Failed to serialize to JSON")
+                .set_code(CODE_RUNTIME_ERROR)
         })?,
         OutputFormat::Yaml => serde_yaml::to_string(content).map_err(|e| {
             Error::new(SourceError::SerdeYaml(e))
-                .context("Failed to serialize to YAML")
-                .code(CODE_RUNTIME_ERROR)
+                .set_context("Failed to serialize to YAML")
+                .set_code(CODE_RUNTIME_ERROR)
         })?,
     };
 
@@ -211,13 +211,13 @@ pub fn pretty<T: serde::Serialize>(
     let res = match format {
         OutputFormat::Json => serde_json::to_string_pretty(content).map_err(|e| {
             Error::new(SourceError::SerdeJson(e))
-                .context("Failed to serialize to JSON")
-                .code(CODE_RUNTIME_ERROR)
+                .set_context("Failed to serialize to JSON")
+                .set_code(CODE_RUNTIME_ERROR)
         })?,
         OutputFormat::Yaml => serde_yaml::to_string(content).map_err(|e| {
             Error::new(SourceError::SerdeYaml(e))
-                .context("Failed to serialize to YAML")
-                .code(CODE_RUNTIME_ERROR)
+                .set_context("Failed to serialize to YAML")
+                .set_code(CODE_RUNTIME_ERROR)
         })?,
     };
 

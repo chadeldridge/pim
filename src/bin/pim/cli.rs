@@ -62,7 +62,7 @@ impl Cli {
             return Err(Error::new(SourceError::InvalidInputSource(
                 "No valid input sources found".to_string(),
             ))
-            .code(CODE_OPTIONS_ERROR));
+            .set_code(CODE_OPTIONS_ERROR));
         }
 
         // If inputs is stdin then we have some extra work to do.
@@ -78,7 +78,7 @@ impl Cli {
                 return Err(Error::new(SourceError::Msg(
                     "Refusing to run with terminal input/output".to_string(),
                 ))
-                .code(CODE_OPTIONS_ERROR)
+                .set_code(CODE_OPTIONS_ERROR)
                 .print_help());
             }
 
@@ -124,7 +124,7 @@ fn get_sources(path: &PathBuf) -> Result<Vec<Input>> {
                 return Err(Error::new(SourceError::InvalidInputSource(
                     path.display().to_string() + ": " + "Binary input is not supported",
                 ))
-                .code(CODE_OPTIONS_ERROR));
+                .set_code(CODE_OPTIONS_ERROR));
             }
 
             debug!("Input is a file");
@@ -141,15 +141,15 @@ fn from_dir(path: &PathBuf) -> Result<Vec<Input>> {
     let mut inputs = Vec::new();
     let entries = read_dir(path).map_err(|e| {
         Error::new(SourceError::Io(e))
-            .context(format!("reading directory: {}", path.display()).as_str())
-            .code(CODE_RUNTIME_ERROR)
+            .set_context(format!("reading directory: {}", path.display()).as_str())
+            .set_code(CODE_RUNTIME_ERROR)
     })?;
 
     for entry in entries {
         let entry = entry.map_err(|e| {
             Error::new(SourceError::Io(e))
-                .context(format!("reading directory entry in: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
+                .set_context(format!("reading directory entry in: {}", path.display()).as_str())
+                .set_code(CODE_RUNTIME_ERROR)
         })?;
         let file_path = entry.path();
         debug!("Processing directory entry: {}", file_path.display());

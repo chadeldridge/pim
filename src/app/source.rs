@@ -48,7 +48,7 @@ impl Source {
             return Err(Error::new(SourceError::InvalidInputSource(
                 "Source must have at least one job".to_string(),
             ))
-            .code(CODE_RUNTIME_ERROR));
+            .set_code(CODE_RUNTIME_ERROR));
         }
 
         debug!("Converting jobs into target groups");
@@ -57,7 +57,7 @@ impl Source {
                 return Err(Error::new(SourceError::InvalidInputSource(
                     "Jobs in source cannot be empty".to_string(),
                 ))
-                .code(CODE_RUNTIME_ERROR));
+                .set_code(CODE_RUNTIME_ERROR));
             }
 
             debug!("Processing job: {}", job);
@@ -129,8 +129,8 @@ impl SourceFile {
                     //serde_json::from_str(content).map_err(|e| {
                     serde_json::from_reader(input.mut_reader()).map_err(|e| {
                         Error::new(SourceError::SerdeJson(e))
-                            .context("Failed to deserialize source from JSON")
-                            .code(CODE_RUNTIME_ERROR)
+                            .set_context("Failed to deserialize source from JSON")
+                            .set_code(CODE_RUNTIME_ERROR)
                     })?
                 }
                 InputFormat::Yaml => {
@@ -138,16 +138,16 @@ impl SourceFile {
                     //serde_yaml::from_str(content).map_err(|e| {
                     serde_yaml::from_reader(input.mut_reader()).map_err(|e| {
                         Error::new(SourceError::SerdeYaml(e))
-                            .context("Failed to deserialize source from YAML")
-                            .code(CODE_RUNTIME_ERROR)
+                            .set_context("Failed to deserialize source from YAML")
+                            .set_code(CODE_RUNTIME_ERROR)
                     })?
                 }
                 _ => {
                     return Err(Error::new(SourceError::UnsupportedInputFormat(
                         input.format().as_str().to_string(),
                     ))
-                    .context("Unsupported input format for source")
-                    .code(CODE_RUNTIME_ERROR));
+                    .set_context("Unsupported input format for source")
+                    .set_code(CODE_RUNTIME_ERROR));
                 }
             };
 

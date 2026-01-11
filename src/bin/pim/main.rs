@@ -33,11 +33,11 @@ fn setup_logger() {
 /// Handle error and exit program.
 fn exit_handler(error: &Error) -> ! {
     handle_error(error);
-    if error.print_help {
+    if error.is_print_help() {
         cli::Cli::print_help();
     }
-    debug!("Exiting with code {:?}", error.code);
-    std::process::exit(error.code.unwrap_or(1));
+    debug!("Exiting with code {:?}", error.code());
+    std::process::exit(error.code().unwrap_or(1));
 }
 
 /// Main program handler. Gets inputs and outputs, then run subcommands.
