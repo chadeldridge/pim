@@ -49,10 +49,10 @@ impl From<String> for SourceError {
 
 #[derive(Debug)]
 pub struct Error {
-    pub code: Option<i32>,
-    pub context: String,
-    pub print_help: bool,
-    pub source: SourceError,
+    code: Option<i32>,
+    context: String,
+    print_help: bool,
+    source: SourceError,
 }
 
 impl std::fmt::Display for Error {
@@ -81,7 +81,37 @@ impl Error {
         }
     }
 
-    pub fn context(mut self, context: &str) -> Self {
+    pub fn code(&self) -> Option<i32> {
+        self.code
+    }
+
+    pub fn mut_code(&mut self, code: i32) {
+        self.code = Some(code);
+    }
+
+    pub fn set_code(mut self, code: i32) -> Self {
+        self.code = Some(code);
+        self
+    }
+
+    pub fn unset_code(mut self) -> Self {
+        self.code = None;
+        self
+    }
+
+    pub fn context(&self) -> &str {
+        &self.context
+    }
+
+    pub fn mut_context(&mut self, context: &str) {
+        if !self.context.is_empty() {
+            self.context = format!("{}\n{}", context, self.context);
+        } else {
+            self.context = context.to_owned();
+        }
+    }
+
+    pub fn set_context(mut self, context: &str) -> Self {
         if !context.is_empty() {
             self.context = context.to_owned();
         } else {
@@ -89,6 +119,10 @@ impl Error {
         }
 
         self
+    }
+
+    pub fn is_print_help(&self) -> bool {
+        self.print_help
     }
 
     pub fn print_help(mut self) -> Self {
@@ -101,14 +135,12 @@ impl Error {
         self
     }
 
-    pub fn code(mut self, code: i32) -> Self {
-        self.code = Some(code);
-        self
+    pub fn source(&self) -> &SourceError {
+        &self.source
     }
 
-    pub fn no_code(mut self) -> Self {
-        self.code = None;
-        self
+    pub fn mut_source(&mut self, source: SourceError) {
+        self.source = source;
     }
 }
 
@@ -174,9 +206,9 @@ mod tests {
     fn test_error_builder_methods() {
         let source_err = SourceError::Msg("source error".to_string());
         let err = Error::new(source_err)
-            .context("additional context")
+            .set_context("additional context")
             .print_help()
-            .code(42);
+            .set_code(42);
         assert_eq!(err.context, "additional context");
         assert!(err.print_help);
         assert_eq!(err.code, Some(42));
@@ -185,7 +217,7 @@ mod tests {
     #[test]
     fn test_error_display() {
         let source_err = SourceError::Msg("source error".to_string());
-        let err = Error::new(source_err).context("additional context");
+        let err = Error::new(source_err).set_context("additional context");
         let display_str = format!("{}", err);
         assert!(display_str.contains("additional context"));
         assert!(display_str.contains("source error"));

@@ -26,8 +26,8 @@ impl Reader {
         debug!("Creating File reader for path: {}", path.display());
         let file = File::open(path).map_err(|e| {
             Error::new(SourceError::Io(e))
-                .context(format!("Failed to open input file: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
+                .set_context(format!("Failed to open input file: {}", path.display()).as_str())
+                .set_code(CODE_RUNTIME_ERROR)
                 .print_help()
         })?;
         Ok(Reader::File(BufReader::new(file)))
@@ -87,8 +87,8 @@ impl Writer {
         debug!("Creating File writer for path: {}", path.display());
         let file = File::create(path).map_err(|e| {
             Error::new(SourceError::Io(e))
-                .context(format!("Failed to create output file: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
+                .set_context(format!("Failed to create output file: {}", path.display()).as_str())
+                .set_code(CODE_RUNTIME_ERROR)
         })?;
         Ok(Writer::File(file))
     }
@@ -97,13 +97,13 @@ impl Writer {
         match self {
             Writer::Stdout(stdout) => stdout.write_all(buf).map_err(|e| {
                 Error::new(SourceError::Io(e))
-                    .context("Writing to stdout")
-                    .code(CODE_RUNTIME_ERROR)
+                    .set_context("Writing to stdout")
+                    .set_code(CODE_RUNTIME_ERROR)
             }),
             Writer::File(file) => file.write_all(buf).map_err(|e| {
                 Error::new(SourceError::Io(e))
-                    .context("Writing to file")
-                    .code(CODE_RUNTIME_ERROR)
+                    .set_context("Writing to file")
+                    .set_code(CODE_RUNTIME_ERROR)
             }),
             Writer::None => {
                 debug!("No writer available (None), skipping write");
@@ -122,8 +122,8 @@ pub fn read_first_line<R: BufRead>(mut reader: R) -> Result<String> {
     // read_line returns the number of bytes read, which we do not care about here.
     let _ = reader.read_line(&mut content).map_err(|e| {
         Error::new(SourceError::Io(e))
-            .context("reading first line")
-            .code(CODE_RUNTIME_ERROR)
+            .set_context("reading first line")
+            .set_code(CODE_RUNTIME_ERROR)
     })?;
     Ok(content)
 }

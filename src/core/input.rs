@@ -92,8 +92,8 @@ impl Input {
                 return Err(Error::new(SourceError::InvalidInputSource(
                     path.display().to_string(),
                 ))
-                .context("Input source is None")
-                .code(CODE_RUNTIME_ERROR));
+                .set_context("Input source is None")
+                .set_code(CODE_RUNTIME_ERROR));
             }
         }
 
@@ -156,8 +156,8 @@ impl Input {
         debug!("Creating Input from file: {}", path.display());
         let metadata = metadata(path).map_err(|e| {
             Error::new(SourceError::Io(e))
-                .context(format!("error checking file: {}", path.display()).as_str())
-                .code(CODE_RUNTIME_ERROR)
+                .set_context(format!("error checking file: {}", path.display()).as_str())
+                .set_code(CODE_RUNTIME_ERROR)
                 .print_help()
         })?;
         debug!("File metadata obtained: {:?}", metadata);
@@ -189,8 +189,8 @@ impl Input {
                 return Err(Error::new(SourceError::InvalidInputSource(
                     "No reader available (None), skipping content inspection".to_string(),
                 ))
-                .context("No reader available (None) during content inspection")
-                .code(CODE_RUNTIME_ERROR));
+                .set_context("No reader available (None) during content inspection")
+                .set_code(CODE_RUNTIME_ERROR));
             }
         };
 

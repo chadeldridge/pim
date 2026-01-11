@@ -95,7 +95,7 @@ impl TargetFile {
         let output = match Output::new(&output_path, format.clone()) {
             Ok(output) => output,
             Err(e) => {
-                return Err(e.context(&format!(
+                return Err(e.set_context(&format!(
                     "Failed to create target output file for job '{}'",
                     job
                 )));
