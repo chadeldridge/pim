@@ -50,7 +50,7 @@ fn handler(shell: &mut cli::Cli) -> Result<()> {
     let output = shell.output()?;
     debug!("Outputs obtained: {:?}", output);
 
-    // TODO: This will later become a match on a subcommand arguement as new features are added.
+    // TODO: This will later become a match on a subcommand argument as new features are added.
     // Run exporter.
     exporter(inputs, output)
 }

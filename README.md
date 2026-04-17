@@ -25,9 +25,9 @@ Write target files to directory.
 Source can be STDIN, file, or a directory. If source is a directory, pim will read all files in the directory as source files.
 
 ### Target
-If target is not specificied pim will use STDOUT. If target is a file, pim will write all output to that single file. If target is a directory, pim will write individual files per job. Providing a directory as the target is the prefered use.
+If target is not specified pim will use STDOUT. If target is a file, pim will write all output to that single file. If target is a directory, pim will write individual files per job. Providing a directory as the target is the preferred use.
 
-If you are outputing to another command with STDOUT pim will not pretty print the data.
+If you are outputting to another command with STDOUT pim will not pretty print the data.
 
 ## Source File
 Formatting of the source file should follow.
