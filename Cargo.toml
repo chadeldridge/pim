@@ -1,6 +1,12 @@
 [package]
 name = "pim"
 version = "0.1.0"
+description = "A small utility to convert yaml into prometheus file_sd json target files."
+categories = ["command-line-utilities", "compilers", "text-formatting"]
+authors = ["Chad Eldridge <chad.eldridge@gmail.com>"]
+homepage = "https://github.com/chadeldridge/pim"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/chadeldridge/pim"
 edition = "2024"
 
 [dependencies]
@@ -26,4 +32,4 @@ self_named_module_files = "warn"
 name = "pim"
 path = "src/bin/pim/main.rs"
 test = false
-doc = false
+doc = true
