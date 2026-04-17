@@ -286,6 +286,9 @@ jobs:
       #    fi
 
       # Test file conversion
+      - name: Create targets dir
+        shell: bash
+        run: mkdir testdata/targets
       - name: Run pim
         shell: bash
         run: $BUILD_CMD run --locked --target=${{ matrix.job.target }} -- -s
