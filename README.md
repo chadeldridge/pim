@@ -105,3 +105,23 @@ File: path/to/blackbox_ssh_targets.json
 
 # Installation
 Download the archive for your OS from the release page and place the binary in your path.
+```
+$ echo $PATH | tr ':' '\n'
+/home/user/.local/bin
+/home/user/bin
+/usr/local/sbin
+/usr/local/bin
+/usr/sbin
+/usr/bin
+/sbin
+/bin
+/usr/games
+/usr/local/games
+/snap/bin
+$ tar xfz pim-v0.1.0-x86_64-unknown-linux-gnu.tar.gz 
+$ cp pim-v0.1.0-x86_64-unknown-linux-gnu/pim ~/bin/
+$ pim --version
+pim 0.1.0
+```
+
+A windows EXE is also available.
