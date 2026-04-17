@@ -10,6 +10,7 @@ use std::{
 
 pub const DEFAULT_OUTPUT_FORMAT: OutputFormat = OutputFormat::Json;
 
+/// The kind of output destination (stdout, file, or directory).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OutputKind {
     Stdout,
@@ -29,6 +30,7 @@ impl OutputKind {
     }
 }
 
+/// The format of the output data (json, yaml, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OutputFormat {
     Json,
@@ -62,8 +64,7 @@ pub struct Output {
     writer: Writer,
     kind: OutputKind,
     format: OutputFormat,
-    // Make pretty public to allow overriding pretty writer logic. Useful for testing.
-    pub pretty: bool,
+    pretty: bool,
 }
 
 impl Debug for Output {
@@ -155,6 +156,11 @@ impl Output {
 
     pub fn is_pretty(&self) -> bool {
         self.pretty
+    }
+
+    // Allow setting pretty to allow override of default behavior.
+    pub fn set_pretty(&mut self, pretty: bool) {
+        self.pretty = pretty;
     }
 
     pub fn write<T: serde::Serialize>(&mut self, job: &str, content: &T) -> Result<()> {

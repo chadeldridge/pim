@@ -11,12 +11,31 @@ use std::{
 
 pub const DEFAULT_INPUT_FORMAT: InputFormat = InputFormat::Yaml;
 
+/// The kind of input source (stdin or file).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputKind {
     Stdin,
     File(PathBuf),
 }
 
+impl InputKind {
+    pub fn new(path: &Path) -> Self {
+        if path == Path::new("-") || path == Path::new("<stdin>") {
+            InputKind::Stdin
+        } else {
+            InputKind::File(path.to_path_buf())
+        }
+    }
+
+    pub fn path(&self) -> Option<&PathBuf> {
+        match self {
+            InputKind::Stdin => None,
+            InputKind::File(p) => Some(p),
+        }
+    }
+}
+
+/// The format of the input data (json, yaml, etc.).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputFormat {
     Json,
@@ -53,13 +72,21 @@ impl InputFormat {
     }
 }
 
+/// Represents an input sources for the application, holding the reader, kind, format, and other metadata.
 pub struct Input {
+    /// The io reader for the input source.
     reader: Reader,
+    /// The kind of input source (stdin or file).
     kind: InputKind,
+    /// The format of the input (json, yaml, etc.).
     format: InputFormat,
+    /// Whether the input is from a terminal.
     is_terminal: bool,
+    /// The content type of the input (binary, utf8, etc.).
     content_type: Option<ContentType>,
+    /// The actual content read from the input source.
     content: String,
+    /// Metadata about the input source, if applicable. Good for getting if directory, size, etc.
     metadata: Option<Metadata>,
 }
 

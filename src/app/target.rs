@@ -4,6 +4,7 @@ use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 
+/// A group of targets for Prometheus file-based service discovery.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(from = "TargetHelper")]
 pub struct TargetGroup {
@@ -13,6 +14,7 @@ pub struct TargetGroup {
     targets: Vec<String>,
 }
 
+/// Helper struct for deserializing TargetGroup.
 #[derive(Debug, Deserialize)]
 struct TargetHelper {
     labels: BTreeMap<String, String>,
@@ -54,14 +56,27 @@ impl TargetGroup {
         &self.job
     }
 
+    pub fn mut_jobs(&mut self) -> &mut String {
+        &mut self.job
+    }
+
     pub fn labels(&self) -> &BTreeMap<String, String> {
         &self.labels
+    }
+
+    pub fn mut_labels(&mut self) -> &mut BTreeMap<String, String> {
+        &mut self.labels
     }
 
     pub fn targets(&self) -> &Vec<String> {
         &self.targets
     }
 
+    pub fn mut_targets(&mut self) -> &mut Vec<String> {
+        &mut self.targets
+    }
+
+    /// Hash for quick comparison of TargetGroup based on job and labels.
     pub fn hash(&self) -> u64 {
         use std::hash::{Hash, Hasher};
         debug!("Hashing TargetGroup for job '{}'", self.job);
@@ -77,6 +92,7 @@ impl TargetGroup {
     }
 }
 
+/// A Prometheus file-based service discovery target file.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TargetFile {
     job: String,
@@ -114,12 +130,24 @@ impl TargetFile {
         &self.job
     }
 
+    pub fn mut_job(&mut self) -> &mut String {
+        &mut self.job
+    }
+
     pub fn output(&self) -> &Output {
         &self.output
     }
 
+    pub fn mut_output(&mut self) -> &mut Output {
+        &mut self.output
+    }
+
     pub fn targets(&self) -> &Vec<TargetGroup> {
         &self.targets
+    }
+
+    pub fn mut_targets(&mut self) -> &mut Vec<TargetGroup> {
+        &mut self.targets
     }
 
     pub fn add_target(&mut self, target: TargetGroup) {
@@ -153,6 +181,7 @@ fn construct_filebuf(path: &mut PathBuf, job: &str, format: &OutputFormat) -> Pa
     path.to_path_buf()
 }
 
+/// A mapping of job names to their corresponding TargetFile.
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 /// A mapping of job names to their corresponding TargetFile.
 pub struct TargetFiles {
